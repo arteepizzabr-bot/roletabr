@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roleta da Sorte - Lógica Refeita</title>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap');
+        body {
+            margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh;
+            background: radial-gradient(circle at center, #2c003e 0%, #0d011a 100%);
+            font-family: 'Orbitron', sans-serif; overflow: hidden; color: #e0e0e0;
+        }
+        body::before {
+            content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://www.transparenttextures.com/patterns/stardust.png') repeat;
+            opacity: 0.3; pointer-events: none; z-index: -1;
+        }
+        .roleta-container { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; perspective: 1000px; }
+        .ponteiro {
+            width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent;
+            border-top: 60px solid #FFD700; position: absolute; top: -25px; z-index: 10;
+            filter: drop-shadow(0px -5px 8px rgba(255, 215, 0, 0.8)); transform-origin: bottom center;
+        }
+        .roleta {
+            width: 500px; height: 500px; border-radius: 50%; position: relative; border: 15px solid #6a0572;
+            box-shadow: 0 0 50px rgba(170, 0, 255, 0.8), inset 0 0 30px rgba(0, 0, 0, 0.9), 0 0 100px rgba(255, 215, 0, 0.3);
+            
+            /* VOLTAMOS AO GRADIENTE SIMPLES, SEM ROTAÇÕES QUE CAUSARAM A BAGUNÇA */
+            background: conic-gradient(
+                #ee0979 0deg 45deg, #5e0094 45deg 90deg, #ee0979 90deg 135deg, #5e0094 135deg 180deg,
+                #ee0979 180deg 225deg, #5e0094 225deg 270deg, #ee0979 270deg 315deg, #5e0094 315deg 360deg
+            );
+            transition: transform 6s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        .roleta::after {
+            content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80px; height: 80px; border-radius: 50%;
+            background: radial-gradient(circle at center, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 70%);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.6); pointer-events: none;
+        }
+        .segmento {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            transform: rotate(calc(var(--i) * 45deg)); overflow: hidden;
+        }
+        .segmento span {
+            display: block; position: absolute; box-sizing: border-box; left: 50%; top: 50%;
+            color: #fff; font-size: 1.1em; font-weight: 900;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 215, 0, 0.5);
+            white-space: nowrap; text-align: center; transform-origin: left center;
+            transform: translateX(25%) rotate(22.5deg);
+        }
+        .botao-girar {
+            margin-top: 50px; padding: 20px 60px; font-size: 30px; font-weight: 900; font-family: 'Orbitron', sans-serif;
+            color: #0d011a; background: linear-gradient(145deg, #FFEA00 0%, #FFA500 100%);
+            border: none; border-radius: 12px; cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.7), inset 0 -5px 10px rgba(0,0,0,0.5);
+            transition: transform 0.1s, background 0.3s, box-shadow 0.3s;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        /* ... (resto do CSS que já está correto) ... */
+        .botao-girar:hover {
+            background: linear-gradient(145deg, #FFF050 0%, #FFB222 100%); transform: translateY(-3px);
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.9), inset 0 -5px 10px rgba(0,0,0,0.5);
+        }
+        .botao-girar:active { transform: scale(0.95); box-shadow: 0 0 10px rgba(255, 215, 0, 0.5), inset 0 -2px 5px rgba(0,0,0,0.5); }
+        .botao-girar:disabled {
+            background: linear-gradient(145deg, #333, #1a1a1a); color: #666; cursor: not-allowed;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4); transform: scale(1);
+        }
+        .resultado-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; visibility: hidden; opacity: 0; transition: visibility 0.3s, opacity 0.3s;
+        }
+        .resultado-overlay.show { visibility: visible; opacity: 1; }
+        #resultado-texto {
+            font-size: 3em; color: #FFEA00;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 165, 0, 0.6);
+            margin-bottom: 40px; text-align: center; animation: pulse 1.5s infinite alternate;
+        }
+        .fechar-resultado {
+            padding: 15px 40px; font-size: 1.5em; font-weight: bold; font-family: 'Orbitron', sans-serif;
+            color: #0d011a; background: linear-gradient(145deg, #00BFFF 0%, #007FFF 100%);
+            border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 0 15px rgba(0, 191, 255, 0.7);
+            transition: transform 0.1s, background 0.3s;
+        }
+        .fechar-resultado:hover { background: linear-gradient(145deg, #33CFFF 0%, #339FFF 100%); transform: translateY(-2px); }
+        @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
+    </style>
+</head>
+<body>
+
+    <div class="roleta-container">
+        <div class="ponteiro"></div>
+        <div class="roleta" id="roleta"></div>
+        <button class="botao-girar" id="botao-girar">GIRE AQUI!</button>
+    </div>
+
+    <div class="resultado-overlay" id="resultado-overlay">
+        <span id="resultado-texto"></span>
+        <button class="fechar-resultado" id="fechar-resultado">OK!</button>
+    </div>
+
+    <audio id="som-giro" src="https://assets.mixkit.co/sfx/preview/mixkit-sci-fi-click-switch-2198.mp3" preload="auto"></audio>
+    <audio id="som-vitoria" src="https://assets.mixkit.co.sfx/preview/mixkit-arcade-bonus-alert-870.mp3" preload="auto"></audio>
+    <audio id="som-derrota" src="https://assets.mixkit.co/sfx/preview/mixkit-negative-game-buzz-323.mp3" preload="auto"></audio>
+    <audio id="som-quase" src="https://assets.mixkit.co/sfx/preview/mixkit-negative-game-notification-2478.mp3" preload="auto"></audio>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const roleta = document.getElementById('roleta');
+            const botaoGirar = document.getElementById('botao-girar');
+            // ... (resto das constantes que já estão corretas)
+            const resultadoOverlay = document.getElementById('resultado-overlay');
+            const resultadoTexto = document.getElementById('resultado-texto');
+            const fecharResultadoBotao = document.getElementById('fechar-resultado');
+            const somGiro = document.getElementById('som-giro');
+            const somVitoria = document.getElementById('som-vitoria');
+            const somDerrota = document.getElementById('som-derrota');
+            const somQuase = document.getElementById('som-quase');
+
+            const premios = [
+                "5% DE DESCONTO", "10% DE DESCONTO", "15% DE DESCONTO", "NÃO FOI DESSA VEZ",
+                "ENTREGA GRÁTIS", "REFRI GRÁTIS", "GIRE DE NOVO", "20% DE DESCONTO"
+            ];
+
+            const numPremios = premios.length;
+            const anguloSegmento = 360 / numPremios;
+            let podeGirar = true;
+            let anguloAtual = 0;
+
+            const criarSegmentos = () => {
+                roleta.innerHTML = '';
+                premios.forEach((premio, i) => {
+                    const segmento = document.createElement('div');
+                    segmento.className = 'segmento';
+                    segmento.style.setProperty('--i', i);
+                    const spanPremio = document.createElement('span');
+                    spanPremio.textContent = premio;
+                    segmento.appendChild(spanPremio);
+                    roleta.appendChild(segmento);
+                });
+            };
+
+            const verificarGiroDiario = () => {
+                const ultimoGiro = localStorage.getItem('ultimoGiroData');
+                if (ultimoGiro) {
+                    const hoje = new Date().toDateString();
+                    if (ultimoGiro === hoje) {
+                        botaoGirar.disabled = true;
+                        botaoGirar.textContent = 'JÁ GIROU HOJE!';
+                        podeGirar = false;
+                    }
+                }
+            };
+            
+            botaoGirar.addEventListener('click', () => {
+                if (!podeGirar) return;
+                podeGirar = false;
+                botaoGirar.disabled = true;
+                botaoGirar.textContent = 'GIRANDO...';
+                somGiro.currentTime = 0;
+                somGiro.play();
+
+                // ===================================================================
+                // --- CÁLCULO DE ROTAÇÃO REFEITO DO ZERO (LÓGICA CORRETA E SIMPLES) ---
+                // ===================================================================
+
+                // Posição da seta em graus (0=direita, 90=baixo, 180=esquerda, 270=topo)
+                const POSICAO_DA_SETA = 270;
+
+                // 1. Sorteia o prêmio que queremos que ganhe.
+                const indicePremio = Math.floor(Math.random() * numPremios);
+                const voltasExtras = Math.floor(Math.random() * 5) + 5;
+
+                // 2. Calcula a posição VISUAL do centro desse prêmio na roleta parada.
+                // Ex: O centro da fatia 0 está em 22.5 graus, da fatia 1 em 67.5, etc.
+                const anguloCentroDoPremio = (indicePremio * anguloSegmento) + (anguloSegmento / 2);
+
+                // 3. O cálculo final: Para o prêmio parar na seta, precisamos girar a roleta
+                // de forma que a posição do prêmio (anguloCentroDoPremio) termine na POSICAO_DA_SETA.
+                // A fórmula é: Rotação = PosiçãoFinalDesejada - PosiçãoInicial
+                const rotacaoFinal = POSICAO_DA_SETA - anguloCentroDoPremio;
+                
+                // Adiciona as voltas extras e a rotação atual para um giro contínuo e animado
+                const anguloTotalDeGiro = (voltasExtras * 360) + rotacaoFinal;
+                
+                // Aplicamos a rotação. O CSS 'transform: rotate()' gira no sentido anti-horário.
+                roleta.style.transition = 'transform 6s cubic-bezier(0.25, 0.1, 0.25, 1)';
+                roleta.style.transform = `rotate(${anguloTotalDeGiro}deg)`;
+                
+                roleta.addEventListener('transitionend', () => {
+                    somGiro.pause();
+                    
+                    // O prêmio mostrado no Pop-up será 'premios[indicePremio]', que agora
+                    // corresponde perfeitamente à rotação visual calculada.
+                    const premioGanho = premios[indicePremio];
+                    resultadoTexto.textContent = premioGanho;
+                    resultadoOverlay.classList.add('show');
+
+                    // =================== FIM DA LÓGICA DE ROTAÇÃO ===================
+
+                    if (premioGanho.toUpperCase() === "NÃO FOI DESSA VEZ") { somDerrota.play(); } 
+                    else if (premioGanho.toUpperCase() === "GIRE DE NOVO") { somQuase.play(); }
+                    else { somVitoria.play(); }
+
+                    if (premioGanho.toUpperCase() === "GIRE DE NOVO") {
+                        podeGirar = true;
+                        botaoGirar.disabled = false;
+                        botaoGirar.textContent = 'GIRE DE NOVO!';
+                    } else {
+                        localStorage.setItem('ultimoGiroData', new Date().toDateString());
+                        botaoGirar.textContent = 'VOLTE AMANHÃ!';
+                    }
+                }, { once: true });
+            });
+
+            fecharResultadoBotao.addEventListener('click', () => {
+                resultadoOverlay.classList.remove('show');
+            });
+
+            criarSegmentos();
+            verificarGiroDiario();
+        });
+    </script>
+</body>
+</html>
