@@ -65,9 +65,9 @@ canvas {
 <button id="spin">Girar Agora</button>
 <div id="message"></div>
 
-<audio id="tick" src="tick-1.mp3" preload="auto"></audio>
-<audio id="win" src="applause-8.mp3" preload="auto"></audio>
-<audio id="lose" src="boo-01.mp3" preload="auto"></audio>
+<audio id="tick" src="https://www.soundjay.com/misc/sounds/tick-1.mp3" preload="auto"></audio>
+<audio id="win" src="https://www.soundjay.com/human/sounds/applause-8.mp3" preload="auto"></audio>
+<audio id="lose" src="https://www.soundjay.com/human/sounds/boo-01.mp3" preload="auto"></audio>
 
 <script>
 const options = [
@@ -109,12 +109,11 @@ function drawWheel() {
         ctx.restore();
     }
 
-    // Marcador dourado invertido verticalmente
     ctx.fillStyle = "gold";
     ctx.beginPath();
-    ctx.moveTo(200, 400);   // invertido: ponta para baixo
-    ctx.lineTo(195, 380);
-    ctx.lineTo(205, 380);
+    ctx.moveTo(200, 20);
+    ctx.lineTo(190, 0);
+    ctx.lineTo(210, 0);
     ctx.closePath();
     ctx.fill();
 }
@@ -144,10 +143,8 @@ function rotateWheel(spinAngle, spinTime, spinTimeTotal) {
     let spinAngleIncrement = easeOut(spinTime, 0, spinAngle, spinTimeTotal);
     startAngle += (spinAngleIncrement * Math.PI) / 180;
     drawWheel();
-
     tickSound.currentTime = 0;
     tickSound.play();
-
     spinTimeout = setTimeout(() => rotateWheel(spinAngle, spinTime, spinTimeTotal), 30);
 }
 
